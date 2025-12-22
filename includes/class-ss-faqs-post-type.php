@@ -97,6 +97,7 @@ class SS_FAQs_Post_Type {
 			'show_in_graphql' => true,
 			'graphql_single_name' => 'ssFaq',
 			'graphql_plural_name' => 'ssFaqs',
+			'taxonomies' => [SS_FAQs_Taxonomies::TAXONOMY],
 		];
 
 		register_post_type(self::POST_TYPE, $args);

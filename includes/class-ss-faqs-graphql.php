@@ -54,6 +54,16 @@ class SS_FAQs_GraphQL {
 			},
 		]);
 
+		// Register custom where arguments for FAQ connection
+		register_graphql_field(
+			'RootQueryToSsFaqConnectionWhereArgs',
+			'faqType',
+			[
+				'type' => 'String',
+				'description' => __('Filter FAQs by FAQ type slug', 'ss-faqs'),
+			],
+		);
+
 		// Register related product field if WooCommerce is active
 		if (SS_FAQs::is_woocommerce_active()) {
 			register_graphql_field('SsFaq', 'relatedProduct', [
@@ -71,21 +81,19 @@ class SS_FAQs_GraphQL {
 						return null;
 					}
 
-					// Return the product post for WPGraphQL to resolve
-					$product_post = get_post($product_id);
+					// Return the product for WPGraphQL to resolve
+					$product = wc_get_product($product_id);
 
-					if (
-						!$product_post ||
-						$product_post->post_type !== 'product'
-					) {
+					if (!$product) {
 						return null;
 					}
 
-					return new \WPGraphQL\Model\Post($product_post);
+					// Use WooCommerce product model for proper GraphQL resolution
+					return new \WPGraphQL\WooCommerce\Model\Product($product);
 				},
 			]);
 
-			// Register input field for filtering FAQs by product
+			// Register input field for filtering FAQs by product ID
 			register_graphql_field(
 				'RootQueryToSsFaqConnectionWhereArgs',
 				'relatedProductId',
@@ -97,6 +105,7 @@ class SS_FAQs_GraphQL {
 					),
 				],
 			);
+
 			// Register slug argument for filtering FAQs by product slug
 			register_graphql_field(
 				'RootQueryToSsFaqConnectionWhereArgs',
@@ -108,14 +117,6 @@ class SS_FAQs_GraphQL {
 						'ss-faqs',
 					),
 				],
-			);
-
-			// Add filter to handle the custom where argument
-			add_filter(
-				'graphql_post_object_connection_query_args',
-				[$this, 'filter_faqs_by_product'],
-				10,
-				5,
 			);
 		}
 
@@ -193,43 +194,117 @@ class SS_FAQs_GraphQL {
 				];
 			},
 		]);
+
+		// Add filter to handle custom where arguments
+		add_filter(
+			'graphql_post_object_connection_query_args',
+			[$this, 'filter_faqs_queries'],
+			10,
+			5,
+		);
 	}
 
 	/**
-	 * Filter FAQs by product ID or slug
+	 * Filter FAQ queries by custom arguments
 	 */
-	public function filter_faqs_by_product(
+	public function filter_faqs_queries(
 		$query_args,
 		$source,
 		$args,
 		$context,
 		$info
 	) {
-		// Determine product ID from ID or slug
-		$product_id = null;
+		// Only apply filter to FAQ queries
+		// post_type can be either a string or an array from WPGraphQL
+		$post_type = $query_args['post_type'] ?? null;
+		$is_faq_query = false;
 
-		if (isset($args['where']['relatedProductId']) && $query_args['post_type'] === SS_FAQs_Post_Type::POST_TYPE) {
-			$product_id = absint($args['where']['relatedProductId']);
-		} elseif (isset($args['where']['relatedProductSlug']) && $query_args['post_type'] === SS_FAQs_Post_Type::POST_TYPE) {
-			$slug = sanitize_title($args['where']['relatedProductSlug']);
-			$product = get_page_by_path($slug, OBJECT, 'product');
-			$product_id = $product ? $product->ID : 0;
+		if (is_array($post_type)) {
+			$is_faq_query = in_array(SS_FAQs_Post_Type::POST_TYPE, $post_type, true);
+		} elseif (is_string($post_type)) {
+			$is_faq_query = ($post_type === SS_FAQs_Post_Type::POST_TYPE);
 		}
 
-		if (null === $product_id) {
+		if (!$is_faq_query) {
 			return $query_args;
 		}
 
-		if (!isset($query_args['meta_query'])) {
-			$query_args['meta_query'] = [];
+		// Initialize meta_query if we need to filter by product
+		$product_id = $this->get_product_id_from_args($args);
+		if ($product_id) {
+			// Ensure meta_query exists
+			if (!isset($query_args['meta_query'])) {
+				$query_args['meta_query'] = [];
+			}
+
+			// Set relation if multiple meta queries exist
+			if (!isset($query_args['meta_query']['relation'])) {
+				$query_args['meta_query']['relation'] = 'AND';
+			}
+
+			// Add the product filter
+			$query_args['meta_query'][] = [
+				'key' => 'related_product',
+				'value' => $product_id,
+				'compare' => '=',
+				'type' => 'NUMERIC',
+			];
 		}
 
-		$query_args['meta_query'][] = [
-			'key' => 'related_product',
-			'value' => $product_id,
-			'compare' => '=',
-		];
+		// Handle Taxonomy filtering
+		if (!empty($args['where']['faqType'])) {
+			// Ensure tax_query exists
+			if (!isset($query_args['tax_query'])) {
+				$query_args['tax_query'] = [];
+			}
+
+			// Set relation if multiple tax queries exist
+			if (!isset($query_args['tax_query']['relation'])) {
+				$query_args['tax_query']['relation'] = 'AND';
+			}
+
+			// Add the taxonomy filter
+			$query_args['tax_query'][] = [
+				'taxonomy' => SS_FAQs_Taxonomies::TAXONOMY,
+				'field' => 'slug',
+				'terms' => sanitize_title($args['where']['faqType']),
+			];
+		}
 
 		return $query_args;
+	}
+
+	/**
+	 * Get product ID from GraphQL arguments
+	 *
+	 * @param array $args GraphQL query arguments
+	 * @return int|null Product ID or null if not found
+	 */
+	private function get_product_id_from_args($args) {
+		// Check for direct product ID
+		if (!empty($args['where']['relatedProductId'])) {
+			return absint($args['where']['relatedProductId']);
+		}
+
+		// Check for product slug
+		if (!empty($args['where']['relatedProductSlug'])) {
+			$slug = sanitize_title($args['where']['relatedProductSlug']);
+			
+			// Query for product by slug
+			$products = get_posts([
+				'name' => $slug,
+				'post_type' => 'product',
+				'post_status' => 'publish',
+				'posts_per_page' => 1,
+				'fields' => 'ids',
+				'no_found_rows' => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			]);
+
+			return !empty($products) ? absint($products[0]) : null;
+		}
+
+		return null;
 	}
 }

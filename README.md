@@ -50,7 +50,7 @@ query GetFaqs {
 }
 ```
 
-### Query FAQs by Product (WooCommerce)
+### Query FAQs by Product Slug
 
 ```graphql
 query GetProductFaqs($productSlug: String!) {
@@ -65,6 +65,38 @@ query GetProductFaqs($productSlug: String!) {
           name
         }
       }
+    }
+  }
+}
+```
+
+### Query FAQs by Type Slug
+
+```graphql
+query GetFaqsByType($typeSlug: String!) {
+  ssFaqs(where: { faqType: $typeSlug }) {
+    nodes {
+      title
+      content
+      faqTypes {
+        nodes {
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+```
+
+### Combined Filter (Product + Type)
+
+```graphql
+query GetProductFaqsByType($productSlug: String!, $typeSlug: String!) {
+  ssFaqs(where: { relatedProductSlug: $productSlug, faqType: $typeSlug }) {
+    nodes {
+      title
+      content
     }
   }
 }
