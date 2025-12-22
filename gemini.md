@@ -33,7 +33,7 @@ ss-faqs/
 - **Taxonomy** `faq-type` with default terms: General, Usuario, Envios y Entregas, Devoluciones y Cambios.
 - **Likes Counter** – numeric SCF field, default 0, exposed via GraphQL.
 - **Product Relationship** – SCF post‑object field linking to a WooCommerce product (only when WooCommerce is active).
-- **GraphQL** – queries for all FAQs, FAQs filtered by product, and a mutation `incrementFaqLikes`.
+- **GraphQL** – queries for all FAQs, FAQs filtered by product slug, and a mutation `incrementFaqLikes`.
 
 ## Future Maintenance Notes
 

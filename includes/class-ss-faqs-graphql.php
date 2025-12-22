@@ -97,6 +97,18 @@ class SS_FAQs_GraphQL {
 					),
 				],
 			);
+			// Register slug argument for filtering FAQs by product slug
+			register_graphql_field(
+				'RootQueryToSsFaqConnectionWhereArgs',
+				'relatedProductSlug',
+				[
+					'type' => 'String',
+					'description' => __(
+						'Filter FAQs by related product slug',
+						'ss-faqs',
+					),
+				],
+			);
 
 			// Add filter to handle the custom where argument
 			add_filter(
@@ -184,7 +196,7 @@ class SS_FAQs_GraphQL {
 	}
 
 	/**
-	 * Filter FAQs by product ID
+	 * Filter FAQs by product ID or slug
 	 */
 	public function filter_faqs_by_product(
 		$query_args,
@@ -193,22 +205,30 @@ class SS_FAQs_GraphQL {
 		$context,
 		$info
 	) {
-		if (
-			isset($args['where']['relatedProductId']) &&
-			$query_args['post_type'] === SS_FAQs_Post_Type::POST_TYPE
-		) {
+		// Determine product ID from ID or slug
+		$product_id = null;
+
+		if (isset($args['where']['relatedProductId']) && $query_args['post_type'] === SS_FAQs_Post_Type::POST_TYPE) {
 			$product_id = absint($args['where']['relatedProductId']);
-
-			if (!isset($query_args['meta_query'])) {
-				$query_args['meta_query'] = [];
-			}
-
-			$query_args['meta_query'][] = [
-				'key' => 'related_product',
-				'value' => $product_id,
-				'compare' => '=',
-			];
+		} elseif (isset($args['where']['relatedProductSlug']) && $query_args['post_type'] === SS_FAQs_Post_Type::POST_TYPE) {
+			$slug = sanitize_title($args['where']['relatedProductSlug']);
+			$product = get_page_by_path($slug, OBJECT, 'product');
+			$product_id = $product ? $product->ID : 0;
 		}
+
+		if (null === $product_id) {
+			return $query_args;
+		}
+
+		if (!isset($query_args['meta_query'])) {
+			$query_args['meta_query'] = [];
+		}
+
+		$query_args['meta_query'][] = [
+			'key' => 'related_product',
+			'value' => $product_id,
+			'compare' => '=',
+		];
 
 		return $query_args;
 	}

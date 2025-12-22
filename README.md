@@ -32,41 +32,41 @@ A WordPress plugin that provides a **FAQ** custom post type with:
 
 ```graphql
 query GetFaqs {
-	ssFaqs {
-		nodes {
-			id
-			databaseId
-			title
-			content
-			likes
-			faqTypes {
-				nodes {
-					name
-					slug
-				}
-			}
-		}
-	}
+  ssFaqs {
+    nodes {
+      id
+      databaseId
+      title
+      content
+      likes
+      faqTypes {
+        nodes {
+          name
+          slug
+        }
+      }
+    }
+  }
 }
 ```
 
 ### Query FAQs by Product (WooCommerce)
 
 ```graphql
-query GetProductFaqs($productId: Int!) {
-	ssFaqs(where: { relatedProductId: $productId }) {
-		nodes {
-			title
-			content
-			likes
-			relatedProduct {
-				... on SimpleProduct {
-					id
-					name
-				}
-			}
-		}
-	}
+query GetProductFaqs($productSlug: String!) {
+  ssFaqs(where: { relatedProductSlug: $productSlug }) {
+    nodes {
+      title
+      content
+      likes
+      relatedProduct {
+        ... on SimpleProduct {
+          id
+          name
+        }
+      }
+    }
+  }
 }
 ```
 
@@ -74,12 +74,12 @@ query GetProductFaqs($productId: Int!) {
 
 ```graphql
 mutation LikeFaq($id: Int!) {
-	incrementFaqLikes(input: { databaseId: $id }) {
-		likes
-		ssFaq {
-			title
-		}
-	}
+  incrementFaqLikes(input: { databaseId: $id }) {
+    likes
+    ssFaq {
+      title
+    }
+  }
 }
 ```
 
