@@ -104,6 +104,7 @@ class SS_FAQs_Taxonomies {
 			'show_in_graphql' => true,
 			'graphql_single_name' => 'faqType',
 			'graphql_plural_name' => 'faqTypes',
+			'graphql_register_root_field' => false,
 		];
 
 		register_taxonomy(self::TAXONOMY, SS_FAQs_Post_Type::POST_TYPE, $args);

@@ -89,6 +89,81 @@ query GetFaqsByType($typeSlug: String!) {
 }
 ```
 
+### Query FAQs by Multiple Types (Include)
+
+Use `faqTypeIn` to filter FAQs that belong to any of the specified taxonomy slugs:
+
+```graphql
+query GetFaqsByTypes($typeSlugs: [String!]) {
+  ssFaqs(where: { faqTypeIn: $typeSlugs }) {
+    nodes {
+      title
+      content
+      faqTypes {
+        nodes {
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+```
+
+**Example variables:**
+
+```json
+{
+  "typeSlugs": ["general", "envios-y-entregas"]
+}
+```
+
+### Query FAQs Excluding Specific Types
+
+Use `faqTypeNotIn` to exclude FAQs that belong to specified taxonomy slugs:
+
+```graphql
+query GetFaqsExcludingTypes($excludeSlugs: [String!]) {
+  ssFaqs(where: { faqTypeNotIn: $excludeSlugs }) {
+    nodes {
+      title
+      content
+      faqTypes {
+        nodes {
+          name
+          slug
+        }
+      }
+    }
+  }
+}
+```
+
+**Example variables:**
+
+```json
+{
+  "excludeSlugs": ["producto"]
+}
+```
+
+### Combine Include and Exclude Filters
+
+You can use both `faqTypeIn` and `faqTypeNotIn` together:
+
+```graphql
+query GetFilteredFaqs {
+  ssFaqs(
+    where: { faqTypeIn: ["general", "usuario"], faqTypeNotIn: ["producto"] }
+  ) {
+    nodes {
+      title
+      content
+    }
+  }
+}
+```
+
 ### Combined Filter (Product + Type)
 
 ```graphql

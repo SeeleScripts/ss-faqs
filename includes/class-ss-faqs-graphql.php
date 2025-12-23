@@ -64,6 +64,26 @@ class SS_FAQs_GraphQL {
 			],
 		);
 
+		// Register faqTypeIn - filter by array of taxonomy slugs (include)
+		register_graphql_field(
+			'RootQueryToSsFaqConnectionWhereArgs',
+			'faqTypeIn',
+			[
+				'type' => ['list_of' => 'String'],
+				'description' => __('Filter FAQs to only include these FAQ type slugs', 'ss-faqs'),
+			],
+		);
+
+		// Register faqTypeNotIn - filter by array of taxonomy slugs (exclude)
+		register_graphql_field(
+			'RootQueryToSsFaqConnectionWhereArgs',
+			'faqTypeNotIn',
+			[
+				'type' => ['list_of' => 'String'],
+				'description' => __('Filter FAQs to exclude these FAQ type slugs', 'ss-faqs'),
+			],
+		);
+
 		// Register related product field if WooCommerce is active
 		if (SS_FAQs::is_woocommerce_active()) {
 			register_graphql_field('SsFaq', 'relatedProduct', [
@@ -252,7 +272,11 @@ class SS_FAQs_GraphQL {
 		}
 
 		// Handle Taxonomy filtering
-		if (!empty($args['where']['faqType'])) {
+		$has_tax_filter = !empty($args['where']['faqType']) || 
+			!empty($args['where']['faqTypeIn']) || 
+			!empty($args['where']['faqTypeNotIn']);
+
+		if ($has_tax_filter) {
 			// Ensure tax_query exists
 			if (!isset($query_args['tax_query'])) {
 				$query_args['tax_query'] = [];
@@ -263,12 +287,36 @@ class SS_FAQs_GraphQL {
 				$query_args['tax_query']['relation'] = 'AND';
 			}
 
-			// Add the taxonomy filter
-			$query_args['tax_query'][] = [
-				'taxonomy' => SS_FAQs_Taxonomies::TAXONOMY,
-				'field' => 'slug',
-				'terms' => sanitize_title($args['where']['faqType']),
-			];
+			// Handle single faqType (legacy support)
+			if (!empty($args['where']['faqType'])) {
+				$query_args['tax_query'][] = [
+					'taxonomy' => SS_FAQs_Taxonomies::TAXONOMY,
+					'field' => 'slug',
+					'terms' => sanitize_title($args['where']['faqType']),
+				];
+			}
+
+			// Handle faqTypeIn - include only these taxonomy slugs
+			if (!empty($args['where']['faqTypeIn']) && is_array($args['where']['faqTypeIn'])) {
+				$sanitized_terms = array_map('sanitize_title', $args['where']['faqTypeIn']);
+				$query_args['tax_query'][] = [
+					'taxonomy' => SS_FAQs_Taxonomies::TAXONOMY,
+					'field' => 'slug',
+					'terms' => $sanitized_terms,
+					'operator' => 'IN',
+				];
+			}
+
+			// Handle faqTypeNotIn - exclude these taxonomy slugs
+			if (!empty($args['where']['faqTypeNotIn']) && is_array($args['where']['faqTypeNotIn'])) {
+				$sanitized_terms = array_map('sanitize_title', $args['where']['faqTypeNotIn']);
+				$query_args['tax_query'][] = [
+					'taxonomy' => SS_FAQs_Taxonomies::TAXONOMY,
+					'field' => 'slug',
+					'terms' => $sanitized_terms,
+					'operator' => 'NOT IN',
+				];
+			}
 		}
 
 		return $query_args;
